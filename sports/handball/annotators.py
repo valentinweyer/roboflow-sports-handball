@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import supervision as sv
 from typing import Tuple, Optional, List
-from sports.basketball.config import CourtConfiguration
+from sports.handball.config import CourtConfiguration
 from sports.common.core import MeasurementUnit
 
 
