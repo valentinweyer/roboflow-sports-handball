@@ -37,7 +37,7 @@ HANDBALL_PRESETS_CM: Dict[HandballStandard, Dict[str, int]] = {
 
 
 @dataclass
-class HandballCourtConfiguration:
+class CourtConfiguration:
     """
     Handball court (IHF indoor): 40m x 20m.
 
