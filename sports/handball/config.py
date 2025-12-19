@@ -11,13 +11,13 @@ CENTIMETERS_PER_FOOT = Decimal("30.48")
 CENTIMETERS_PER_METER = Decimal("100")
 
 
-class HandballStandard(Enum):
+class League(Enum):
     IHF_INDOOR = "ihf_indoor"  # 40m x 20m
 
 
 # internal presets in centimeters
-HANDBALL_PRESETS_CM: Dict[HandballStandard, Dict[str, int]] = {
-    HandballStandard.IHF_INDOOR: dict(
+HANDBALL_PRESETS_CM: Dict[League, Dict[str, int]] = {
+    League.IHF_INDOOR: dict(
         court_length=4000,
         court_width=2000,
         goal_width=300,           # 3m
@@ -47,7 +47,7 @@ class CourtConfiguration:
 
     Origin (0,0) is one corner (choose consistently with your pipeline).
     """
-    standard: HandballStandard = HandballStandard.IHF_INDOOR
+    standard: League = League.IHF_INDOOR
     measurement_unit: MeasurementUnit = MeasurementUnit.CENTIMETERS
 
     # internal values in centimeters
