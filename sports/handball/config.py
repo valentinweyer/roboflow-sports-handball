@@ -211,10 +211,8 @@ class CourtConfiguration:
         (4, 5),
         # goal segments (posts)
         (6, 7), (9, 10),
-        # 6m straight anchors (not full arc)
+        # 6m straight anchors
         (12, 13), (14, 15),
-        # 9m straight anchors (not full arc)
-        (16, 17), (18, 19),
         # 7m line
         (20, 21), (22, 23),
         # 4m line
