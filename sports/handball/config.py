@@ -228,64 +228,61 @@ class CourtConfiguration:
         ) // 2
 
     def _raw_vertices_centimeters(self) -> List[Tuple[int, int]]:
-        """Generate vertices for handball court in centimeters."""
+        """Generate vertices for handball court in centimeters.
+        37 keypoints matching the model output (indices 0-36 for keypoints 01-37).
+        """
         goal_start = self._goal_start_in_centimeters
+        goal_end = goal_start + self._goal_width_in_centimeters
         middle_court_width = self._court_width_in_centimeters // 2
         court_width = self._court_width_in_centimeters
         court_length = self._court_length_in_centimeters
         half_length = court_length // 2
 
         return [
-            # Corner vertices
-            (0, 0),  # 0: Left baseline, bottom corner
-            (0, court_width),  # 1: Left baseline, top corner
-            (court_length, 0),  # 2: Right baseline, bottom corner
-            (court_length, court_width),  # 3: Right baseline, top corner
+            # LEFT SIDE (Purple keypoints 01-13, indices 0-12)
+            (0, court_width),  # 0 (KP 01): Top left corner
+            (0, goal_end),  # 1 (KP 02): Left side upper 6m goal line intersection
+            (0, goal_end),  # 2 (KP 03): Left side upper goal post
+            (0, goal_start),  # 3 (KP 04): Left side lower goal post
+            (0, goal_start),  # 4 (KP 05): Left side lower 6m goal line intersection
+            (0, 0),  # 5 (KP 06): Bottom left corner
+            (0, court_width),  # 6 (KP 07): Left top 9m out line intersection (at boundary)
+            (self._goal_area_radius_in_centimeters, goal_end),  # 7 (KP 08): Left 6m area upper point
+            (self._goal_area_radius_in_centimeters, goal_start),  # 8 (KP 09): Left 6m area lower point
+            (0, 0),  # 9 (KP 10): Left lower 9m out line intersection (at boundary)
+            (self._goal_area_radius_in_centimeters, middle_court_width),  # 10 (KP 11): Left side interior point (6m center)
+            (self._penalty_spot_distance_in_centimeters, goal_end),  # 11 (KP 12): Left 7m line upper point
+            (self._penalty_spot_distance_in_centimeters, goal_start),  # 12 (KP 13): Left 7m line lower point
             
-            # Goal line vertices (left side)
-            (0, goal_start),  # 4: Left goal, bottom post
-            (0, goal_start + self._goal_width_in_centimeters),  # 5: Left goal, top post
-            (0, middle_court_width),  # 6: Left goal center
+            # CENTER SECTION (White keypoints 14-20, indices 13-19)
+            (half_length, court_width),  # 13 (KP 14): Top center
+            (half_length, goal_end),  # 14 (KP 15): Center mid-upper
+            (half_length - self._center_circle_radius_in_centimeters, middle_court_width),  # 15 (KP 16): Center left point
+            (half_length, middle_court_width),  # 16 (KP 17): Center point
+            (half_length + self._center_circle_radius_in_centimeters, middle_court_width),  # 17 (KP 18): Center right point
+            (half_length, goal_start),  # 18 (KP 19): Center mid-lower
+            (half_length, 0),  # 19 (KP 20): Bottom center
             
-            # Goal line vertices (right side)
-            (court_length, goal_start),  # 7: Right goal, bottom post
-            (court_length, goal_start + self._goal_width_in_centimeters),  # 8: Right goal, top post
-            (court_length, middle_court_width),  # 9: Right goal center
+            # RIGHT SIDE (Orange keypoints 21-33, indices 20-32)
+            (court_length - self._penalty_spot_distance_in_centimeters, goal_end),  # 20 (KP 21): Right 7m line upper point
+            (court_length - self._penalty_spot_distance_in_centimeters, goal_start),  # 21 (KP 22): Right 7m line lower point
+            (court_length - self._goal_area_radius_in_centimeters, middle_court_width),  # 22 (KP 23): Right side interior point (6m center)
+            (court_length, court_width),  # 23 (KP 24): Right top 9m out line intersection (at boundary)
+            (court_length - self._goal_area_radius_in_centimeters, goal_end),  # 24 (KP 25): Right 6m area upper point
+            (court_length - self._goal_area_radius_in_centimeters, goal_start),  # 25 (KP 26): Right 6m area lower point
+            (court_length, 0),  # 26 (KP 27): Right lower 9m out line intersection (at boundary)
+            (court_length, court_width),  # 27 (KP 28): Top right corner
+            (court_length, goal_end),  # 28 (KP 29): Right side upper 6m goal line intersection
+            (court_length, goal_end),  # 29 (KP 30): Right side upper goal post
+            (court_length, goal_start),  # 30 (KP 31): Right side lower goal post
+            (court_length, goal_start),  # 31 (KP 32): Right side lower 6m goal line intersection
+            (court_length, 0),  # 32 (KP 33): Bottom right corner
             
-            # Center line
-            (half_length, 0),  # 10: Center line, bottom
-            (half_length, court_width),  # 11: Center line, top
-            (half_length, middle_court_width),  # 12: Center point
-            
-            # Left side key points for 6m line arc
-            (self._goal_area_radius_in_centimeters, goal_start),  # 13: Left 6m arc, bottom
-            (self._goal_area_radius_in_centimeters, middle_court_width),  # 14: Left 6m arc, center
-            (self._goal_area_radius_in_centimeters, goal_start + self._goal_width_in_centimeters),  # 15: Left 6m arc, top
-            
-            # Right side key points for 6m line arc
-            (court_length - self._goal_area_radius_in_centimeters, goal_start),  # 16: Right 6m arc, bottom
-            (court_length - self._goal_area_radius_in_centimeters, middle_court_width),  # 17: Right 6m arc, center
-            (court_length - self._goal_area_radius_in_centimeters, goal_start + self._goal_width_in_centimeters),  # 18: Right 6m arc, top
-            
-            # Penalty spots (7m line)
-            (self._penalty_spot_distance_in_centimeters, middle_court_width),  # 19: Left penalty spot
-            (court_length - self._penalty_spot_distance_in_centimeters, middle_court_width),  # 20: Right penalty spot
-            
-            # 9m line key points (left side)
-            (self._free_throw_line_distance_in_centimeters, goal_start),  # 21: Left 9m arc, bottom
-            (self._free_throw_line_distance_in_centimeters, middle_court_width),  # 22: Left 9m arc, center
-            (self._free_throw_line_distance_in_centimeters, goal_start + self._goal_width_in_centimeters),  # 23: Left 9m arc, top
-            
-            # 9m line key points (right side)
-            (court_length - self._free_throw_line_distance_in_centimeters, goal_start),  # 24: Right 9m arc, bottom
-            (court_length - self._free_throw_line_distance_in_centimeters, middle_court_width),  # 25: Right 9m arc, center
-            (court_length - self._free_throw_line_distance_in_centimeters, goal_start + self._goal_width_in_centimeters),  # 26: Right 9m arc, top
-            
-            # Goalkeeper restraining line (4m line)
-            (self._goalkeeper_restraining_line_in_centimeters, goal_start),  # 27: Left 4m line, bottom
-            (self._goalkeeper_restraining_line_in_centimeters, goal_start + self._goal_width_in_centimeters),  # 28: Left 4m line, top
-            (court_length - self._goalkeeper_restraining_line_in_centimeters, goal_start),  # 29: Right 4m line, bottom
-            (court_length - self._goalkeeper_restraining_line_in_centimeters, goal_start + self._goal_width_in_centimeters),  # 30: Right 4m line, top
+            # CENTER SECTION CONTINUED (White keypoints 34-37, indices 33-36)
+            (self._free_throw_line_distance_in_centimeters, goal_end),  # 33 (KP 34): Left 9m area upper point
+            (self._free_throw_line_distance_in_centimeters, goal_start),  # 34 (KP 35): Left 9m area lower point
+            (court_length - self._free_throw_line_distance_in_centimeters, goal_end),  # 35 (KP 36): Right 9m area upper point
+            (court_length - self._free_throw_line_distance_in_centimeters, goal_start),  # 36 (KP 37): Right 9m area lower point
         ]
 
     def _vertices_in_unit(self) -> List[Tuple[float, float]]:
@@ -311,61 +308,111 @@ class CourtConfiguration:
 
     edges: List[Tuple[int, int]] = field(default_factory=lambda: [
         # Outer court boundaries
-        (0, 1),  # Left baseline
-        (0, 10),  # Left side, bottom half
-        (10, 2),  # Right side, bottom half
-        (2, 3),  # Right baseline
-        (3, 11),  # Right side, top half
-        (11, 1),  # Left side, top half
+        (0, 5),   # Left baseline (KP 01 to KP 06)
+        (5, 19),  # Bottom baseline (KP 06 to KP 20)
+        (19, 32), # Right baseline bottom to corner (KP 20 to KP 33)
+        (32, 27), # Right baseline (KP 33 to KP 28)
+        (27, 13), # Top baseline (KP 28 to KP 14)
+        (13, 0),  # Top baseline left (KP 14 to KP 01)
         
         # Center line
-        (10, 11),
+        (13, 19), # Center line (KP 14 to KP 20)
         
-        # Goal lines (left side)
-        (4, 5),  # Left goal line
+        # Goal lines
+        (2, 3),   # Left goal (KP 03 to KP 04)
+        (29, 30), # Right goal (KP 30 to KP 31)
         
-        # Goal lines (right side)
-        (7, 8),  # Right goal line
+        # Left 6m area arc connections
+        (7, 8),   # Left 6m arc (KP 08 to KP 09)
+        (1, 7),   # Connection to 6m upper (KP 02 to KP 08)
+        (8, 4),   # Connection to 6m lower (KP 09 to KP 05)
         
-        # 6m goal area connections (left side)
-        (13, 4),  # Bottom connection
-        (15, 5),  # Top connection
+        # Right 6m area arc connections
+        (24, 25), # Right 6m arc (KP 25 to KP 26)
+        (28, 24), # Connection to 6m upper (KP 29 to KP 25)
+        (25, 31), # Connection to 6m lower (KP 26 to KP 32)
         
-        # 6m goal area connections (right side)
-        (16, 7),  # Bottom connection
-        (18, 8),  # Top connection
+        # Left 7m line (penalty line)
+        (11, 12), # Left 7m line (KP 12 to KP 13)
         
-        # Goalkeeper restraining line (4m) (left side)
-        (27, 28),
+        # Right 7m line (penalty line)
+        (20, 21), # Right 7m line (KP 21 to KP 22)
         
-        # Goalkeeper restraining line (4m) (right side)
-        (29, 30),
+        # Left 9m area arc connections
+        (33, 34), # Left 9m arc (KP 34 to KP 35)
+        
+        # Right 9m area arc connections
+        (35, 36), # Right 9m arc (KP 36 to KP 37)
+        
+        # Center circle
+        (15, 16), # Center circle left to center (KP 16 to KP 17)
+        (16, 17), # Center circle center to right (KP 17 to KP 18)
     ])
 
     labels: List[str] = field(default_factory=lambda: [
-        "BL-Bottom", "BL-Top", "BR-Bottom", "BR-Top",  # 0-3: Corners
-        "LG-Bottom", "LG-Top", "LG-Center",  # 4-6: Left goal
-        "RG-Bottom", "RG-Top", "RG-Center",  # 7-9: Right goal
-        "CL-Bottom", "CL-Top", "Center",  # 10-12: Center line
-        "L6m-Bottom", "L6m-Center", "L6m-Top",  # 13-15: Left 6m line
-        "R6m-Bottom", "R6m-Center", "R6m-Top",  # 16-18: Right 6m line
-        "L-Penalty", "R-Penalty",  # 19-20: Penalty spots
-        "L9m-Bottom", "L9m-Center", "L9m-Top",  # 21-23: Left 9m line
-        "R9m-Bottom", "R9m-Center", "R9m-Top",  # 24-26: Right 9m line
-        "L4m-Bottom", "L4m-Top", "R4m-Bottom", "R4m-Top",  # 27-30: 4m goalkeeper lines
+        # LEFT SIDE (Purple keypoints 01-13, indices 0-12)
+        "KP01-TL-Corner",         # 0 (KP 01): Top left corner
+        "KP02-L-Upper-6m",        # 1 (KP 02): Left side upper 6m goal line intersection
+        "KP03-L-Upper-Goal",      # 2 (KP 03): Left side upper goal post
+        "KP04-L-Lower-Goal",      # 3 (KP 04): Left side lower goal post
+        "KP05-L-Lower-6m",        # 4 (KP 05): Left side lower 6m goal line intersection
+        "KP06-BL-Corner",         # 5 (KP 06): Bottom left corner
+        "KP07-L-Top-9m",          # 6 (KP 07): Left top 9m out line intersection
+        "KP08-L-6m-Upper",        # 7 (KP 08): Left 6m area upper point
+        "KP09-L-6m-Lower",        # 8 (KP 09): Left 6m area lower point
+        "KP10-L-Bottom-9m",       # 9 (KP 10): Left lower 9m out line intersection
+        "KP11-L-6m-Center",       # 10 (KP 11): Left side interior point (6m center)
+        "KP12-L-7m-Upper",        # 11 (KP 12): Left 7m line upper point
+        "KP13-L-7m-Lower",        # 12 (KP 13): Left 7m line lower point
+        
+        # CENTER SECTION (White keypoints 14-20, indices 13-19)
+        "KP14-Top-Center",        # 13 (KP 14): Top center
+        "KP15-Center-Mid-Upper",  # 14 (KP 15): Center mid-upper
+        "KP16-Center-Left",       # 15 (KP 16): Center left point
+        "KP17-Center",            # 16 (KP 17): Center point
+        "KP18-Center-Right",      # 17 (KP 18): Center right point
+        "KP19-Center-Mid-Lower",  # 18 (KP 19): Center mid-lower
+        "KP20-Bottom-Center",     # 19 (KP 20): Bottom center
+        
+        # RIGHT SIDE (Orange keypoints 21-33, indices 20-32)
+        "KP21-R-7m-Upper",        # 20 (KP 21): Right 7m line upper point
+        "KP22-R-7m-Lower",        # 21 (KP 22): Right 7m line lower point
+        "KP23-R-6m-Center",       # 22 (KP 23): Right side interior point (6m center)
+        "KP24-R-Top-9m",          # 23 (KP 24): Right top 9m out line intersection
+        "KP25-R-6m-Upper",        # 24 (KP 25): Right 6m area upper point
+        "KP26-R-6m-Lower",        # 25 (KP 26): Right 6m area lower point
+        "KP27-R-Bottom-9m",       # 26 (KP 27): Right lower 9m out line intersection
+        "KP28-TR-Corner",         # 27 (KP 28): Top right corner
+        "KP29-R-Upper-6m",        # 28 (KP 29): Right side upper 6m goal line intersection
+        "KP30-R-Upper-Goal",      # 29 (KP 30): Right side upper goal post
+        "KP31-R-Lower-Goal",      # 30 (KP 31): Right side lower goal post
+        "KP32-R-Lower-6m",        # 31 (KP 32): Right side lower 6m goal line intersection
+        "KP33-BR-Corner",         # 32 (KP 33): Bottom right corner
+        
+        # CENTER SECTION CONTINUED (White keypoints 34-37, indices 33-36)
+        "KP34-L-9m-Upper",        # 33 (KP 34): Left 9m area upper point
+        "KP35-L-9m-Lower",        # 34 (KP 35): Left 9m area lower point
+        "KP36-R-9m-Upper",        # 35 (KP 36): Right 9m area upper point
+        "KP37-R-9m-Lower",        # 36 (KP 37): Right 9m area lower point
     ])
 
     colors: List[str] = field(default_factory=lambda: [
-        "#FF1493", "#FF1493", "#FF1493", "#FF1493",  # Corners: Pink
-        "#00BFFF", "#00BFFF", "#00BFFF",  # Left goal: Blue
-        "#00BFFF", "#00BFFF", "#00BFFF",  # Right goal: Blue
-        "#A4F84B", "#A4F84B", "#A4F84B",  # Center: Green
-        "#52F8C4", "#52F8C4", "#52F8C4",  # Left 6m: Teal
-        "#52F8C4", "#52F8C4", "#52F8C4",  # Right 6m: Teal
-        "#FF6B6B", "#FF6B6B",  # Penalty spots: Red
-        "#FFA500", "#FFA500", "#FFA500",  # Left 9m: Orange
-        "#FFA500", "#FFA500", "#FFA500",  # Right 9m: Orange
-        "#9370DB", "#9370DB", "#9370DB", "#9370DB",  # 4m lines: Purple
+        # LEFT SIDE (Purple keypoints 01-13, indices 0-12)
+        "#9B59B6", "#9B59B6", "#9B59B6", "#9B59B6", "#9B59B6",  # 0-4: Purple
+        "#9B59B6", "#9B59B6", "#9B59B6", "#9B59B6", "#9B59B6",  # 5-9: Purple
+        "#9B59B6", "#9B59B6", "#9B59B6",                        # 10-12: Purple
+        
+        # CENTER SECTION (White keypoints 14-20, indices 13-19)
+        "#FFFFFF", "#FFFFFF", "#FFFFFF", "#FFFFFF", "#FFFFFF",  # 13-17: White
+        "#FFFFFF", "#FFFFFF",                                   # 18-19: White
+        
+        # RIGHT SIDE (Orange keypoints 21-33, indices 20-32)
+        "#FF8C00", "#FF8C00", "#FF8C00", "#FF8C00", "#FF8C00",  # 20-24: Orange
+        "#FF8C00", "#FF8C00", "#FF8C00", "#FF8C00", "#FF8C00",  # 25-29: Orange
+        "#FF8C00", "#FF8C00", "#FF8C00",                        # 30-32: Orange
+        
+        # CENTER SECTION CONTINUED (White keypoints 34-37, indices 33-36)
+        "#FFFFFF", "#FFFFFF", "#FFFFFF", "#FFFFFF",             # 33-36: White
     ])
 
     # Direct index getters
@@ -376,7 +423,7 @@ class CourtConfiguration:
         Returns:
             `List[int]`: List of vertex indexes for left goal area.
         """
-        return [4, 13, 14, 15, 5]
+        return [4, 8, 10, 7, 1]  # KP 05, 09, 11, 08, 02
 
     @property
     def right_goal_area_indexes(self) -> List[int]:
@@ -385,7 +432,7 @@ class CourtConfiguration:
         Returns:
             `List[int]`: List of vertex indexes for right goal area.
         """
-        return [7, 16, 17, 18, 8]
+        return [31, 25, 22, 24, 28]  # KP 32, 26, 23, 25, 29
 
     @property
     def left_goal_index(self) -> int:
@@ -394,7 +441,7 @@ class CourtConfiguration:
         Returns:
             `int`: Vertex index for left goal center coordinates.
         """
-        return 6
+        return 10  # KP 11 - Left 6m center point
 
     @property
     def right_goal_index(self) -> int:
@@ -403,7 +450,7 @@ class CourtConfiguration:
         Returns:
             `int`: Vertex index for right goal center coordinates.
         """
-        return 9
+        return 22  # KP 23 - Right 6m center point
 
     @property
     def court_corner_indexes(self) -> List[int]:
@@ -413,22 +460,31 @@ class CourtConfiguration:
             `List[int]`: List of vertex indexes for court corners in order:
                 bottom-left, top-left, top-right, bottom-right.
         """
-        return [0, 1, 3, 2]
+        return [5, 0, 27, 32]  # KP 06, 01, 28, 33
 
     @property
     def left_penalty_spot_index(self) -> int:
-        """Get vertex index for the left penalty spot (7m line).
+        """Get vertex index for the left penalty spot (7m line center).
         
         Returns:
             `int`: Vertex index for left penalty spot.
         """
-        return 19
+        return 11  # KP 12 - Left 7m line upper point (or could use 12 for lower)
 
     @property
     def right_penalty_spot_index(self) -> int:
-        """Get vertex index for the right penalty spot (7m line).
+        """Get vertex index for the right penalty spot (7m line center).
         
         Returns:
             `int`: Vertex index for right penalty spot.
         """
-        return 20
+        return 20  # KP 21 - Right 7m line upper point (or could use 21 for lower)
+    
+    @property
+    def center_point_index(self) -> int:
+        """Get vertex index for the center point of the court.
+        
+        Returns:
+            `int`: Vertex index for center point.
+        """
+        return 16  # KP 17 - Center point

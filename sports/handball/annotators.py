@@ -183,7 +183,7 @@ def draw_court(
         cv2.line(image, start_px, end_px, line_color.as_bgr(), line_thickness)
 
     # Draw center circle
-    center_px = _to_pixel(config.vertices[12], scale, padding)
+    center_px = _to_pixel(config.vertices[16], scale, padding)  # KP 17 - Center point
     cv2.circle(
         image,
         center_px,
@@ -211,12 +211,22 @@ def draw_court(
             thickness=line_thickness,
         )
         
-        # Draw 9m free throw line arcs (dashed)
-        free_throw_radius_px = int(round(config.free_throw_line_distance * scale))
-        arc_indices = [21, 22, 23] if side == "left" else [24, 25, 26]
-        a_px, b_px, c_px = [
-            _to_pixel(config.vertices[i], scale, padding) for i in arc_indices
-        ]
+        # Draw 9m free throw line arcs
+        # For left: KP 34 (upper), KP 35 (lower); For right: KP 36 (upper), KP 37 (lower)
+        if side == "left":
+            upper_idx, lower_idx = 33, 34  # KP 34, KP 35
+        else:
+            upper_idx, lower_idx = 35, 36  # KP 36, KP 37
+        
+        # Get upper and lower points, calculate middle point
+        upper_pt = config.vertices[upper_idx]
+        lower_pt = config.vertices[lower_idx]
+        middle_pt = (upper_pt[0], (upper_pt[1] + lower_pt[1]) / 2)  # Middle point at center height
+        
+        a_px = _to_pixel(upper_pt, scale, padding)
+        b_px = _to_pixel(middle_pt, scale, padding)
+        c_px = _to_pixel(lower_pt, scale, padding)
+        
         _draw_circular_arc_from_three_points(
             image, a_px, b_px, c_px, line_color.as_bgr(), line_thickness
         )
@@ -231,46 +241,42 @@ def draw_court(
             line_color.as_bgr(),
             -1,  # Filled circle
         )
-        
-        # Draw goalkeeper restraining line (4m line)
-        keeper_indices = (27, 28) if side == "left" else (29, 30)
-        keeper_start_px = _to_pixel(config.vertices[keeper_indices[0]], scale, padding)
-        keeper_end_px = _to_pixel(config.vertices[keeper_indices[1]], scale, padding)
-        cv2.line(image, keeper_start_px, keeper_end_px, line_color.as_bgr(), line_thickness)
 
     # Draw goals (as rectangles at the court ends)
     goal_depth_px = int(20 * scale / 10)  # Goal depth for visualization
     for side in ["left", "right"]:
         if side == "left":
-            goal_bottom_px = _to_pixel(config.vertices[4], scale, padding)
-            goal_top_px = _to_pixel(config.vertices[5], scale, padding)
-            goal_back_x = goal_bottom_px[0] - goal_depth_px
+            # Left goal: KP 04 (index 3) lower post, KP 03 (index 2) upper post
+            goal_lower_px = _to_pixel(config.vertices[3], scale, padding)
+            goal_upper_px = _to_pixel(config.vertices[2], scale, padding)
+            goal_back_x = goal_lower_px[0] - goal_depth_px
             
             # Draw goal rectangle
             cv2.rectangle(
                 image,
-                (goal_back_x, goal_bottom_px[1]),
-                (goal_bottom_px[0], goal_top_px[1]),
+                (goal_back_x, goal_lower_px[1]),
+                (goal_lower_px[0], goal_upper_px[1]),
                 line_color.as_bgr(),
                 line_thickness,
             )
             # Draw goal posts (thicker)
-            cv2.line(image, goal_bottom_px, goal_top_px, line_color.as_bgr(), line_thickness * 2)
+            cv2.line(image, goal_lower_px, goal_upper_px, line_color.as_bgr(), line_thickness * 2)
         else:
-            goal_bottom_px = _to_pixel(config.vertices[7], scale, padding)
-            goal_top_px = _to_pixel(config.vertices[8], scale, padding)
-            goal_back_x = goal_bottom_px[0] + goal_depth_px
+            # Right goal: KP 31 (index 30) lower post, KP 30 (index 29) upper post
+            goal_lower_px = _to_pixel(config.vertices[30], scale, padding)
+            goal_upper_px = _to_pixel(config.vertices[29], scale, padding)
+            goal_back_x = goal_lower_px[0] + goal_depth_px
             
             # Draw goal rectangle
             cv2.rectangle(
                 image,
-                (goal_bottom_px[0], goal_bottom_px[1]),
-                (goal_back_x, goal_top_px[1]),
+                (goal_lower_px[0], goal_lower_px[1]),
+                (goal_back_x, goal_upper_px[1]),
                 line_color.as_bgr(),
                 line_thickness,
             )
             # Draw goal posts (thicker)
-            cv2.line(image, goal_bottom_px, goal_top_px, line_color.as_bgr(), line_thickness * 2)
+            cv2.line(image, goal_lower_px, goal_upper_px, line_color.as_bgr(), line_thickness * 2)
 
     # Draw substitution areas (dashed lines along center line)
     subst_length = config.substitution_area_length
