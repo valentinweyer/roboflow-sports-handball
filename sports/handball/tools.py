@@ -3,15 +3,16 @@ from dataclasses import dataclass
 from typing import Optional, List, Literal, TypedDict
 
 
-BALL_IN_BASKET_MIN_CONSECUTIVE_FRAMES = 2
+BALL_IN_GOAL_MIN_CONSECUTIVE_FRAMES = 2
 JUMP_SHOT_MIN_CONSECUTIVE_FRAMES = 3
-LAYUP_DUNK_MIN_CONSECUTIVE_FRAMES = 3
+BREAKTHROUGH_MIN_CONSECUTIVE_FRAMES = 3
 
 
 class ShotType(Enum):
     NONE = "NONE"
     JUMP = "JUMP"
-    LAYUP = "LAYUP"
+    PENALTY = "PENALTY"
+    BREAKTHROUGH = "BREAKTHROUGH"
 
 
 class ShotEvent(Enum):
@@ -23,11 +24,21 @@ class ShotEvent(Enum):
 class ShotEventRecord(TypedDict):
     event: Literal["START", "MADE", "MISSED"]
     frame: int
-    type: Literal["NONE", "JUMP", "LAYUP"]
+    type: Literal["NONE", "JUMP", "PENALTY", "BREAKTHROUGH"]
 
 
 @dataclass
 class ShotEventTracker:
+    """Track shot events in handball games.
+    
+    Monitors different types of handball shots (jump shots, penalties, breakthroughs)
+    and detects when they start, are made, or are missed based on consecutive frame detection.
+    
+    Args:
+        reset_time_frames: Maximum frames to wait for shot completion before marking as missed
+        minimum_frames_between_starts: Minimum frames between consecutive shot starts
+        cooldown_frames_after_made: Cooldown period after a successful goal before allowing new shot detection
+    """
     reset_time_frames: int
     minimum_frames_between_starts: int
     cooldown_frames_after_made: int
@@ -39,8 +50,9 @@ class ShotEventTracker:
     frames_since_start: int = 0
 
     consecutive_jump_shot_frames: int = 0
-    consecutive_layup_frames: int = 0
-    consecutive_ball_in_basket_frames: int = 0
+    consecutive_penalty_frames: int = 0
+    consecutive_breakthrough_frames: int = 0
+    consecutive_ball_in_goal_frames: int = 0
 
     last_made_frame: Optional[int] = None
 
@@ -48,28 +60,51 @@ class ShotEventTracker:
         self,
         frame_index: int,
         has_jump_shot: bool,
-        has_layup_dunk: bool,
-        has_ball_in_basket: bool,
+        has_penalty: bool,
+        has_breakthrough: bool,
+        has_ball_in_goal: bool,
     ) -> List[ShotEventRecord]:
+        """Update tracker state and detect shot events.
+        
+        Args:
+            frame_index: Current frame number
+            has_jump_shot: Whether a jump shot is detected in this frame
+            has_penalty: Whether a penalty shot (7m) is detected in this frame
+            has_breakthrough: Whether a breakthrough is detected in this frame
+            has_ball_in_goal: Whether the ball is detected in the goal in this frame
+        
+        Returns:
+            List[ShotEventRecord]: List of detected shot events (START, MADE, MISSED)
+        """
         events: List[ShotEventRecord] = []
 
         self.consecutive_jump_shot_frames = self._updated_consecutive_frames(
             self.consecutive_jump_shot_frames, has_jump_shot
         )
-        self.consecutive_layup_frames = self._updated_consecutive_frames(
-            self.consecutive_layup_frames, has_layup_dunk
+        self.consecutive_penalty_frames = self._updated_consecutive_frames(
+            self.consecutive_penalty_frames, has_penalty
         )
-        self.consecutive_ball_in_basket_frames = self._updated_consecutive_frames(
-            self.consecutive_ball_in_basket_frames, has_ball_in_basket
+        self.consecutive_breakthrough_frames = self._updated_consecutive_frames(
+            self.consecutive_breakthrough_frames, has_breakthrough
+        )
+        self.consecutive_ball_in_goal_frames = self._updated_consecutive_frames(
+            self.consecutive_ball_in_goal_frames, has_ball_in_goal
         )
 
         reached_jump_shot_threshold = (
             self.consecutive_jump_shot_frames == JUMP_SHOT_MIN_CONSECUTIVE_FRAMES
         )
-        reached_layup_threshold = (
-            self.consecutive_layup_frames == LAYUP_DUNK_MIN_CONSECUTIVE_FRAMES
+        reached_penalty_threshold = (
+            self.consecutive_penalty_frames == JUMP_SHOT_MIN_CONSECUTIVE_FRAMES
         )
-        should_start_shot = reached_jump_shot_threshold or reached_layup_threshold
+        reached_breakthrough_threshold = (
+            self.consecutive_breakthrough_frames == BREAKTHROUGH_MIN_CONSECUTIVE_FRAMES
+        )
+        should_start_shot = (
+            reached_jump_shot_threshold 
+            or reached_penalty_threshold 
+            or reached_breakthrough_threshold
+        )
 
         if should_start_shot and self._within_post_made_cooldown(frame_index):
             should_start_shot = False
@@ -83,7 +118,13 @@ class ShotEventTracker:
                     should_start_shot = False
 
             if should_start_shot:
-                shot_type = ShotType.JUMP if reached_jump_shot_threshold else ShotType.LAYUP
+                if reached_jump_shot_threshold:
+                    shot_type = ShotType.JUMP
+                elif reached_penalty_threshold:
+                    shot_type = ShotType.PENALTY
+                else:
+                    shot_type = ShotType.BREAKTHROUGH
+                
                 self._start_new_shot(shot_type, frame_index)
                 events.append(self._start_event(frame_index))
 
@@ -113,12 +154,12 @@ class ShotEventTracker:
         self.shot_start_frame = frame_index
         self.shot_deadline_frame = frame_index + self.reset_time_frames
         self.frames_since_start = 0
-        self.consecutive_ball_in_basket_frames = 0
+        self.consecutive_ball_in_goal_frames = 0
 
     def _has_confirmed_make(self) -> bool:
         return (
-            self.consecutive_ball_in_basket_frames
-            >= BALL_IN_BASKET_MIN_CONSECUTIVE_FRAMES
+            self.consecutive_ball_in_goal_frames
+            >= BALL_IN_GOAL_MIN_CONSECUTIVE_FRAMES
         )
 
     def _deadline_reached(self, frame_index: int) -> bool:
@@ -143,8 +184,9 @@ class ShotEventTracker:
 
     def _reset_consecutive_counters(self) -> None:
         self.consecutive_jump_shot_frames = 0
-        self.consecutive_layup_frames = 0
-        self.consecutive_ball_in_basket_frames = 0
+        self.consecutive_penalty_frames = 0
+        self.consecutive_breakthrough_frames = 0
+        self.consecutive_ball_in_goal_frames = 0
 
     def _reset_shot_state(self) -> None:
         self.shot_in_progress = False
