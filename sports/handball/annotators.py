@@ -141,6 +141,7 @@ def draw_court(
     court_length_px = int(round(config.court_length * scale))
     center_circle_radius_px = int(round(config.center_circle_radius * scale))
     goal_area_radius_px = int(round(config.goal_area_radius * scale))
+    free_throw_radius_px = int(round(config.free_throw_line_distance * scale))
 
     image = np.zeros(
         (court_height_px + 2 * padding, court_length_px + 2 * padding, 3),
@@ -151,7 +152,7 @@ def draw_court(
     # Fill goal areas if color is specified
     if goal_area_color is not None:
         # Left goal area
-        left_goal_center = _to_pixel(config.vertices[config.left_goal_index], scale, padding)
+        left_goal_center = _to_pixel(config.left_goal_center, scale, padding)
         cv2.ellipse(
             image,
             center=left_goal_center,
@@ -164,7 +165,7 @@ def draw_court(
         )
         
         # Right goal area
-        right_goal_center = _to_pixel(config.vertices[config.right_goal_index], scale, padding)
+        right_goal_center = _to_pixel(config.right_goal_center, scale, padding)
         cv2.ellipse(
             image,
             center=right_goal_center,
@@ -194,8 +195,9 @@ def draw_court(
 
     # Draw goal area arcs (6m lines) for both sides
     for side in ["left", "right"]:
-        goal_idx = config.left_goal_index if side == "left" else config.right_goal_index
-        goal_center = config.vertices[goal_idx]
+        goal_center = (
+            config.left_goal_center if side == "left" else config.right_goal_center
+        )
         goal_px = _to_pixel(goal_center, scale, padding)
         
         # Draw semicircular arc for goal area
@@ -211,29 +213,23 @@ def draw_court(
             thickness=line_thickness,
         )
         
-        # Draw 9m free throw line arcs
-        # For left: KP 34 (upper), KP 35 (lower); For right: KP 36 (upper), KP 37 (lower)
-        if side == "left":
-            upper_idx, lower_idx = 33, 34  # KP 34, KP 35
-        else:
-            upper_idx, lower_idx = 35, 36  # KP 36, KP 37
-        
-        # Get upper and lower points, calculate middle point
-        upper_pt = config.vertices[upper_idx]
-        lower_pt = config.vertices[lower_idx]
-        middle_pt = (upper_pt[0], (upper_pt[1] + lower_pt[1]) / 2)  # Middle point at center height
-        
-        a_px = _to_pixel(upper_pt, scale, padding)
-        b_px = _to_pixel(middle_pt, scale, padding)
-        c_px = _to_pixel(lower_pt, scale, padding)
-        
-        _draw_circular_arc_from_three_points(
-            image, a_px, b_px, c_px, line_color.as_bgr(), line_thickness
+        # Draw 9m free throw line arcs (concentric with 6m goal area arcs)
+        cv2.ellipse(
+            image,
+            center=goal_px,
+            axes=(free_throw_radius_px, free_throw_radius_px),
+            angle=90,
+            startAngle=start_ang,
+            endAngle=end_ang,
+            color=line_color.as_bgr(),
+            thickness=line_thickness,
         )
         
         # Draw penalty spot (7m line)
-        penalty_idx = config.left_penalty_spot_index if side == "left" else config.right_penalty_spot_index
-        penalty_px = _to_pixel(config.vertices[penalty_idx], scale, padding)
+        penalty_pt = (
+            config.left_penalty_spot if side == "left" else config.right_penalty_spot
+        )
+        penalty_px = _to_pixel(penalty_pt, scale, padding)
         cv2.circle(
             image,
             penalty_px,

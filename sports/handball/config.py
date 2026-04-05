@@ -247,12 +247,15 @@ class CourtConfiguration:
             (0, goal_start),  # 4 (KP 05): Left side lower 6m goal line intersection
             (0, 0),  # 5 (KP 06): Bottom left corner
             (0, court_width),  # 6 (KP 07): Left top 9m out line intersection (at boundary)
-            (self._goal_area_radius_in_centimeters, goal_end),  # 7 (KP 08): Left 6m area upper point
-            (self._goal_area_radius_in_centimeters, goal_start),  # 8 (KP 09): Left 6m area lower point
+            # exact semicircle points around left goal center (0, middle_court_width)
+            # at y = middle ± goal_width/2
+            (581, goal_end),  # 7 (KP 08): Left 6m area upper point
+            (581, goal_start),  # 8 (KP 09): Left 6m area lower point
             (0, 0),  # 9 (KP 10): Left lower 9m out line intersection (at boundary)
             (self._goal_area_radius_in_centimeters, middle_court_width),  # 10 (KP 11): Left side interior point (6m center)
-            (self._penalty_spot_distance_in_centimeters, goal_end),  # 11 (KP 12): Left 7m line upper point
-            (self._penalty_spot_distance_in_centimeters, goal_start),  # 12 (KP 13): Left 7m line lower point
+            # 7m line is a short 1m line centered at mid-court width
+            (self._penalty_spot_distance_in_centimeters, middle_court_width + 50),  # 11 (KP 12): Left 7m line upper point
+            (self._penalty_spot_distance_in_centimeters, middle_court_width - 50),  # 12 (KP 13): Left 7m line lower point
             
             # CENTER SECTION (White keypoints 14-20, indices 13-19)
             (half_length, court_width),  # 13 (KP 14): Top center
@@ -264,12 +267,15 @@ class CourtConfiguration:
             (half_length, 0),  # 19 (KP 20): Bottom center
             
             # RIGHT SIDE (Orange keypoints 21-33, indices 20-32)
-            (court_length - self._penalty_spot_distance_in_centimeters, goal_end),  # 20 (KP 21): Right 7m line upper point
-            (court_length - self._penalty_spot_distance_in_centimeters, goal_start),  # 21 (KP 22): Right 7m line lower point
+            # 7m line is a short 1m line centered at mid-court width
+            (court_length - self._penalty_spot_distance_in_centimeters, middle_court_width + 50),  # 20 (KP 21): Right 7m line upper point
+            (court_length - self._penalty_spot_distance_in_centimeters, middle_court_width - 50),  # 21 (KP 22): Right 7m line lower point
             (court_length - self._goal_area_radius_in_centimeters, middle_court_width),  # 22 (KP 23): Right side interior point (6m center)
             (court_length, court_width),  # 23 (KP 24): Right top 9m out line intersection (at boundary)
-            (court_length - self._goal_area_radius_in_centimeters, goal_end),  # 24 (KP 25): Right 6m area upper point
-            (court_length - self._goal_area_radius_in_centimeters, goal_start),  # 25 (KP 26): Right 6m area lower point
+            # exact semicircle points around right goal center (court_length, middle_court_width)
+            # at y = middle ± goal_width/2
+            (court_length - 581, goal_end),  # 24 (KP 25): Right 6m area upper point
+            (court_length - 581, goal_start),  # 25 (KP 26): Right 6m area lower point
             (court_length, 0),  # 26 (KP 27): Right lower 9m out line intersection (at boundary)
             (court_length, court_width),  # 27 (KP 28): Top right corner
             (court_length, goal_end),  # 28 (KP 29): Right side upper 6m goal line intersection
@@ -279,10 +285,11 @@ class CourtConfiguration:
             (court_length, 0),  # 32 (KP 33): Bottom right corner
             
             # CENTER SECTION CONTINUED (White keypoints 34-37, indices 33-36)
-            (self._free_throw_line_distance_in_centimeters, goal_end),  # 33 (KP 34): Left 9m area upper point
-            (self._free_throw_line_distance_in_centimeters, goal_start),  # 34 (KP 35): Left 9m area lower point
-            (court_length - self._free_throw_line_distance_in_centimeters, goal_end),  # 35 (KP 36): Right 9m area upper point
-            (court_length - self._free_throw_line_distance_in_centimeters, goal_start),  # 36 (KP 37): Right 9m area lower point
+            # exact 9m semicircle points around goal centers at y = middle ± goal_width/2
+            (887, goal_end),  # 33 (KP 34): Left 9m area upper point
+            (887, goal_start),  # 34 (KP 35): Left 9m area lower point
+            (court_length - 887, goal_end),  # 35 (KP 36): Right 9m area upper point
+            (court_length - 887, goal_start),  # 36 (KP 37): Right 9m area lower point
         ]
 
     def _vertices_in_unit(self) -> List[Tuple[float, float]]:
@@ -441,7 +448,7 @@ class CourtConfiguration:
         Returns:
             `int`: Vertex index for left goal center coordinates.
         """
-        return 10  # KP 11 - Left 6m center point
+        return 10  # KP 11 - Left 6m center point (kept for backward compatibility)
 
     @property
     def right_goal_index(self) -> int:
@@ -450,7 +457,29 @@ class CourtConfiguration:
         Returns:
             `int`: Vertex index for right goal center coordinates.
         """
-        return 22  # KP 23 - Right 6m center point
+        return 22  # KP 23 - Right 6m center point (kept for backward compatibility)
+
+    @property
+    def left_goal_center(self) -> Tuple[float, float]:
+        """Get left goal center computed from goal post keypoints.
+
+        Returns:
+            `Tuple[float, float]`: (x, y) coordinates of left goal center.
+        """
+        upper = self.vertices[2]  # KP 03
+        lower = self.vertices[3]  # KP 04
+        return (upper[0], (upper[1] + lower[1]) / 2.0)
+
+    @property
+    def right_goal_center(self) -> Tuple[float, float]:
+        """Get right goal center computed from goal post keypoints.
+
+        Returns:
+            `Tuple[float, float]`: (x, y) coordinates of right goal center.
+        """
+        upper = self.vertices[29]  # KP 30
+        lower = self.vertices[30]  # KP 31
+        return (upper[0], (upper[1] + lower[1]) / 2.0)
 
     @property
     def court_corner_indexes(self) -> List[int]:
@@ -479,6 +508,20 @@ class CourtConfiguration:
             `int`: Vertex index for right penalty spot.
         """
         return 20  # KP 21 - Right 7m line upper point (or could use 21 for lower)
+
+    @property
+    def left_penalty_spot(self) -> Tuple[float, float]:
+        """Get left penalty spot center from 7m line endpoints."""
+        upper = self.vertices[11]  # KP 12
+        lower = self.vertices[12]  # KP 13
+        return (upper[0], (upper[1] + lower[1]) / 2.0)
+
+    @property
+    def right_penalty_spot(self) -> Tuple[float, float]:
+        """Get right penalty spot center from 7m line endpoints."""
+        upper = self.vertices[20]  # KP 21
+        lower = self.vertices[21]  # KP 22
+        return (upper[0], (upper[1] + lower[1]) / 2.0)
     
     @property
     def center_point_index(self) -> int:
