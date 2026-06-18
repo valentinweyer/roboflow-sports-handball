@@ -18,66 +18,6 @@ def _to_pixel(
     )
 
 
-def _draw_circular_arc_from_three_points(
-    image: np.ndarray,
-    first_point: Tuple[float, float],
-    middle_point: Tuple[float, float],
-    last_point: Tuple[float, float],
-    bgr_color: Tuple[int, int, int],
-    thickness: int,
-) -> None:
-    """Draw an arc defined by three points."""
-    def circle_from_three_points(
-        p1: Tuple[float, float],
-        p2: Tuple[float, float],
-        p3: Tuple[float, float],
-    ):
-        sum_sq_p2 = p2[0] ** 2 + p2[1] ** 2
-        term1 = (p1[0] ** 2 + p1[1] ** 2 - sum_sq_p2) / 2.0
-        term2 = (sum_sq_p2 - p3[0] ** 2 - p3[1] ** 2) / 2.0
-        det = (
-            (p1[0] - p2[0]) * (p2[1] - p3[1])
-            - (p2[0] - p3[0]) * (p1[1] - p2[1])
-        )
-        if abs(det) < 1e-10:
-            return (p2, 0.0)
-        center_x = (term1 * (p2[1] - p3[1]) - term2 * (p1[1] - p2[1])) / det
-        center_y = (
-            (p1[0] - p2[0]) * term2 - (p2[0] - p3[0]) * term1
-        ) / det
-        radius = float(np.hypot(center_x - p1[0], center_y - p1[1]))
-        return (center_x, center_y), radius
-
-    def angle_deg(center_xy, point_xy) -> float:
-        return float(
-            np.degrees(
-                np.arctan2(point_xy[1] - center_xy[1], point_xy[0] - center_xy[0])
-            )
-        )
-
-    center, radius = circle_from_three_points(
-        first_point, middle_point, last_point
-    )
-    center_px = (int(round(center[0])), int(round(center[1])))
-    radius_px = int(round(radius))
-
-    start_angle = angle_deg(center, first_point)
-    end_angle = angle_deg(center, last_point)
-    if end_angle < start_angle:
-        end_angle += 360.0
-
-    cv2.ellipse(
-        image,
-        center=center_px,
-        axes=(radius_px, radius_px),
-        angle=0,
-        startAngle=int(round(start_angle)),
-        endAngle=int(round(end_angle)),
-        color=bgr_color,
-        thickness=thickness,
-    )
-
-
 def _draw_dashed_line(
     image: np.ndarray,
     start: Tuple[int, int],
@@ -87,31 +27,91 @@ def _draw_dashed_line(
     dash_length: int = 20,
     gap_length: int = 10,
 ) -> None:
-    """Draw a dashed line between two points."""
     dx = end[0] - start[0]
     dy = end[1] - start[1]
     distance = np.sqrt(dx * dx + dy * dy)
-    
     if distance < 1:
         return
-    
-    # Normalize direction
     dx /= distance
     dy /= distance
-    
     current_dist = 0
     while current_dist < distance:
-        dash_start_x = int(start[0] + dx * current_dist)
-        dash_start_y = int(start[1] + dy * current_dist)
-        
+        dash_start = (int(start[0] + dx * current_dist), int(start[1] + dy * current_dist))
         dash_end_dist = min(current_dist + dash_length, distance)
-        dash_end_x = int(start[0] + dx * dash_end_dist)
-        dash_end_y = int(start[1] + dy * dash_end_dist)
-        
-        cv2.line(image, (dash_start_x, dash_start_y), (dash_end_x, dash_end_y),
-                bgr_color, thickness)
-        
+        dash_end = (int(start[0] + dx * dash_end_dist), int(start[1] + dy * dash_end_dist))
+        cv2.line(image, dash_start, dash_end, bgr_color, thickness)
         current_dist += dash_length + gap_length
+
+
+def _draw_goal_zone(
+    image: np.ndarray,
+    court_x0: float,
+    g_y0: float,
+    g_y1: float,
+    radius_cm: float,
+    side: str,
+    scale: float,
+    padding: int,
+    court_rect_px: Tuple[int, int, int, int],  # x, y, w, h in pixels
+    bgr_color: Tuple[int, int, int],
+    thickness: int,
+    dashed: bool = False,
+) -> None:
+    """
+    Draw two quarter-circle arcs + straight line for one goal zone,
+    clipped to the court boundary.
+
+    Arcs are computed in court coordinates (y-up, matches matplotlib test script),
+    converted to pixel coords, drawn onto a temporary layer, then masked to the
+    court rectangle before blending onto the image.
+    """
+    n = 400
+    direction = 1.0 if side == "left" else -1.0
+    r = radius_cm
+
+    t_upper = np.linspace(np.pi / 2, 0, n)
+    t_lower = np.linspace(0, -np.pi / 2, n)
+
+    # Only the two quarter-circle arcs — straight segment is drawn via config.edges
+    arc_upper = np.array([[court_x0 + direction * r * np.cos(t), g_y1 + r * np.sin(t)] for t in t_upper])
+    arc_lower = np.array([[court_x0 + direction * r * np.cos(t), g_y0 + r * np.sin(t)] for t in t_lower])
+
+    # Draw onto a scratch layer the same size as image
+    layer = np.zeros_like(image)
+
+    def draw_arc_segment(seg):
+        px_pts = np.array([[_to_pixel((float(p[0]), float(p[1])), scale, padding)] for p in seg], dtype=np.int32)
+        if dashed:
+            # Distance-based dashing so spacing is consistent regardless of n or scale
+            dash_px = max(8, int(15 * scale))
+            gap_px  = max(5, int(10 * scale))
+            draw = True
+            bucket = 0.0
+            for i in range(len(px_pts) - 1):
+                p1 = tuple(px_pts[i][0])
+                p2 = tuple(px_pts[i+1][0])
+                seg_len = float(np.hypot(p2[0] - p1[0], p2[1] - p1[1]))
+                if draw:
+                    cv2.line(layer, p1, p2, bgr_color, thickness)
+                bucket += seg_len
+                threshold = dash_px if draw else gap_px
+                if bucket >= threshold:
+                    bucket = 0.0
+                    draw = not draw
+        else:
+            cv2.polylines(layer, [px_pts], False, bgr_color, thickness, cv2.LINE_AA)
+
+    for seg in (arc_upper, arc_lower):
+        draw_arc_segment(seg)
+
+    # Mask to court boundary
+    cx, cy, cw, ch = court_rect_px
+    mask = np.zeros(image.shape[:2], dtype=np.uint8)
+    cv2.rectangle(mask, (cx, cy), (cx + cw, cy + ch), 255, -1)
+    layer[mask == 0] = 0
+
+    # Blend onto image
+    image[layer > 0] = layer[layer > 0]
 
 
 def draw_court(
@@ -123,25 +123,9 @@ def draw_court(
     background_color: sv.Color = sv.Color(200, 160, 120),
     goal_area_color: Optional[sv.Color] = None,
 ) -> np.ndarray:
-    """Render a handball court to an image.
-    
-    Args:
-        config: Court configuration with dimensions
-        scale: Scaling factor for court dimensions to pixels
-        padding: Padding around the court in pixels
-        line_thickness: Thickness of court lines
-        line_color: Color of court lines
-        background_color: Color of court background
-        goal_area_color: Optional fill color for goal areas (6m zones)
-    
-    Returns:
-        np.ndarray: Rendered court image
-    """
     court_height_px = int(round(config.court_width * scale))
     court_length_px = int(round(config.court_length * scale))
     center_circle_radius_px = int(round(config.center_circle_radius * scale))
-    goal_area_radius_px = int(round(config.goal_area_radius * scale))
-    free_throw_radius_px = int(round(config.free_throw_line_distance * scale))
 
     image = np.zeros(
         (court_height_px + 2 * padding, court_length_px + 2 * padding, 3),
@@ -149,148 +133,95 @@ def draw_court(
     )
     image[:, :] = background_color.as_bgr()
 
-    # Fill goal areas if color is specified
+    g_y0 = config.vertices[3][1]  # KP04 lower post
+    g_y1 = config.vertices[2][1]  # KP03 upper post
+
+    court_rect_px = (padding, padding, court_length_px, court_height_px)
+
+    # Goal area fill
     if goal_area_color is not None:
-        # Left goal area
-        left_goal_center = _to_pixel(config.left_goal_center, scale, padding)
-        cv2.ellipse(
-            image,
-            center=left_goal_center,
-            axes=(goal_area_radius_px, goal_area_radius_px),
-            angle=90,
-            startAngle=180,
-            endAngle=360,
-            color=goal_area_color.as_bgr(),
-            thickness=-1,  # Filled
-        )
-        
-        # Right goal area
-        right_goal_center = _to_pixel(config.right_goal_center, scale, padding)
-        cv2.ellipse(
-            image,
-            center=right_goal_center,
-            axes=(goal_area_radius_px, goal_area_radius_px),
-            angle=90,
-            startAngle=0,
-            endAngle=180,
-            color=goal_area_color.as_bgr(),
-            thickness=-1,  # Filled
-        )
+        for side, post_x in [("left", 0.0), ("right", float(config.court_length))]:
+            direction = 1.0 if side == "left" else -1.0
+            r = config.goal_area_radius
+            n = 300
+            t_upper = np.linspace(np.pi / 2, 0, n)
+            t_lower = np.linspace(0, -np.pi / 2, n)
+            arc_upper = [[post_x + direction * r * np.cos(t), g_y1 + r * np.sin(t)] for t in t_upper]
+            arc_lower = [[post_x + direction * r * np.cos(t), g_y0 + r * np.sin(t)] for t in t_lower]
+            poly_pts = (
+                [[post_x, g_y1]] + arc_upper +
+                [[post_x + direction * r, g_y0]] + arc_lower +
+                [[post_x, g_y0]]
+            )
+            poly_px = np.array(
+                [[_to_pixel((float(p[0]), float(p[1])), scale, padding)] for p in poly_pts],
+                dtype=np.int32,
+            )
+            cv2.fillPoly(image, [poly_px.reshape(-1, 2)], goal_area_color.as_bgr())
 
-    # Draw court boundary edges
+    # Court boundary edges — skip 6m/9m straight segments, drawn below from radius
+    skip_edges = {(7, 8), (8, 7), (24, 25), (25, 24),
+                  (33, 34), (34, 33), (35, 36), (36, 35)}
     for start_idx, end_idx in config.edges:
-        start_px = _to_pixel(config.vertices[start_idx], scale, padding)
-        end_px = _to_pixel(config.vertices[end_idx], scale, padding)
-        cv2.line(image, start_px, end_px, line_color.as_bgr(), line_thickness)
+        if (start_idx, end_idx) in skip_edges:
+            continue
+        cv2.line(image,
+                 _to_pixel(config.vertices[start_idx], scale, padding),
+                 _to_pixel(config.vertices[end_idx],   scale, padding),
+                 line_color.as_bgr(), line_thickness)
 
-    # Draw center circle
-    center_px = _to_pixel(config.vertices[16], scale, padding)  # KP 17 - Center point
-    cv2.circle(
-        image,
-        center_px,
-        center_circle_radius_px,
-        line_color.as_bgr(),
-        line_thickness,
-    )
+    # 6m and 9m straight segments drawn from radius so they align exactly with arcs
+    g_y0_px = _to_pixel((0, g_y0), scale, padding)[1]
+    g_y1_px = _to_pixel((0, g_y1), scale, padding)[1]
+    for side, post_x in [("left", 0.0), ("right", float(config.court_length))]:
+        direction = 1.0 if side == "left" else -1.0
+        for r in [config.goal_area_radius, config.free_throw_line_distance]:
+            tx = _to_pixel((post_x + direction * r, 0), scale, padding)[0]
+            cv2.line(image, (tx, g_y0_px), (tx, g_y1_px), line_color.as_bgr(), line_thickness)
 
-    # Draw goal area arcs (6m lines) for both sides
-    for side in ["left", "right"]:
-        goal_center = (
-            config.left_goal_center if side == "left" else config.right_goal_center
-        )
-        goal_px = _to_pixel(goal_center, scale, padding)
-        
-        # Draw semicircular arc for goal area
-        start_ang, end_ang = ((180, 360) if side == "left" else (0, 180))
-        cv2.ellipse(
-            image,
-            center=goal_px,
-            axes=(goal_area_radius_px, goal_area_radius_px),
-            angle=90,
-            startAngle=start_ang,
-            endAngle=end_ang,
-            color=line_color.as_bgr(),
-            thickness=line_thickness,
-        )
-        
-        # Draw 9m free throw line arcs (concentric with 6m goal area arcs)
-        cv2.ellipse(
-            image,
-            center=goal_px,
-            axes=(free_throw_radius_px, free_throw_radius_px),
-            angle=90,
-            startAngle=start_ang,
-            endAngle=end_ang,
-            color=line_color.as_bgr(),
-            thickness=line_thickness,
-        )
-        
-        # Draw penalty spot (7m line)
-        penalty_pt = (
-            config.left_penalty_spot if side == "left" else config.right_penalty_spot
-        )
-        penalty_px = _to_pixel(penalty_pt, scale, padding)
-        cv2.circle(
-            image,
-            penalty_px,
-            max(3, line_thickness),
-            line_color.as_bgr(),
-            -1,  # Filled circle
-        )
+    # Center circle (no diameter lines)
+    cv2.circle(image,
+               _to_pixel(config.vertices[16], scale, padding),
+               center_circle_radius_px,
+               line_color.as_bgr(), line_thickness)
 
-    # Draw goals (as rectangles at the court ends)
-    goal_depth_px = int(20 * scale / 10)  # Goal depth for visualization
+    # Goal area arcs (6m solid, 9m dashed) — clipped to court
+    for side, post_x in [("left", 0.0), ("right", float(config.court_length))]:
+        _draw_goal_zone(image, post_x, g_y0, g_y1,
+                        config.goal_area_radius, side, scale, padding,
+                        court_rect_px, line_color.as_bgr(), line_thickness, dashed=False)
+        _draw_goal_zone(image, post_x, g_y0, g_y1,
+                        config.free_throw_line_distance, side, scale, padding,
+                        court_rect_px, line_color.as_bgr(), line_thickness, dashed=True)
+
+    # Goals
+    goal_depth_px = int(20 * scale / 10)
     for side in ["left", "right"]:
         if side == "left":
-            # Left goal: KP 04 (index 3) lower post, KP 03 (index 2) upper post
             goal_lower_px = _to_pixel(config.vertices[3], scale, padding)
             goal_upper_px = _to_pixel(config.vertices[2], scale, padding)
             goal_back_x = goal_lower_px[0] - goal_depth_px
-            
-            # Draw goal rectangle
-            cv2.rectangle(
-                image,
-                (goal_back_x, goal_lower_px[1]),
-                (goal_lower_px[0], goal_upper_px[1]),
-                line_color.as_bgr(),
-                line_thickness,
-            )
-            # Draw goal posts (thicker)
+            cv2.rectangle(image, (goal_back_x, goal_lower_px[1]),
+                          (goal_lower_px[0], goal_upper_px[1]), line_color.as_bgr(), line_thickness)
             cv2.line(image, goal_lower_px, goal_upper_px, line_color.as_bgr(), line_thickness * 2)
         else:
-            # Right goal: KP 31 (index 30) lower post, KP 30 (index 29) upper post
             goal_lower_px = _to_pixel(config.vertices[30], scale, padding)
             goal_upper_px = _to_pixel(config.vertices[29], scale, padding)
             goal_back_x = goal_lower_px[0] + goal_depth_px
-            
-            # Draw goal rectangle
-            cv2.rectangle(
-                image,
-                (goal_lower_px[0], goal_lower_px[1]),
-                (goal_back_x, goal_upper_px[1]),
-                line_color.as_bgr(),
-                line_thickness,
-            )
-            # Draw goal posts (thicker)
+            cv2.rectangle(image, (goal_lower_px[0], goal_lower_px[1]),
+                          (goal_back_x, goal_upper_px[1]), line_color.as_bgr(), line_thickness)
             cv2.line(image, goal_lower_px, goal_upper_px, line_color.as_bgr(), line_thickness * 2)
 
-    # Draw substitution areas (dashed lines along center line)
-    subst_length = config.substitution_area_length
-    half_subst = subst_length / 2
-    center_x = config.court_length / 2
-    center_y = config.court_width / 2
-    
-    # Left side substitution area (bottom)
-    subst_start_left = _to_pixel((center_x - half_subst, 0), scale, padding)
-    subst_end_left = _to_pixel((center_x + half_subst, 0), scale, padding)
-    _draw_dashed_line(image, subst_start_left, subst_end_left, 
-                     line_color.as_bgr(), line_thickness, dash_length=15, gap_length=10)
-    
-    # Right side substitution area (top)
-    subst_start_right = _to_pixel((center_x - half_subst, config.court_width), scale, padding)
-    subst_end_right = _to_pixel((center_x + half_subst, config.court_width), scale, padding)
-    _draw_dashed_line(image, subst_start_right, subst_end_right,
-                     line_color.as_bgr(), line_thickness, dash_length=15, gap_length=10)
+    # Substitution area dashes
+    half_subst = config.substitution_area_length / 2
+    cx = config.court_length / 2
+    for court_y in [0, config.court_width]:
+        _draw_dashed_line(
+            image,
+            _to_pixel((cx - half_subst, court_y), scale, padding),
+            _to_pixel((cx + half_subst, court_y), scale, padding),
+            line_color.as_bgr(), line_thickness, dash_length=15, gap_length=10,
+        )
 
     return image
 
@@ -310,71 +241,19 @@ def draw_made_and_miss_on_court(
     line_thickness: int = 6,
     court: Optional[np.ndarray] = None,
 ) -> np.ndarray:
-    """Draw made goals as circle outlines and missed shots as crosses.
-    
-    Args:
-        config: Court configuration
-        made_xy: Array of (x, y) coordinates for made goals
-        miss_xy: Array of (x, y) coordinates for missed shots
-        made_thickness: Line thickness for made goal markers
-        miss_thickness: Line thickness for missed shot markers
-        made_color: Color for made goal markers
-        miss_color: Color for missed shot markers
-        made_size: Radius of made goal circles
-        miss_size: Size of missed shot crosses
-        scale: Scaling factor
-        padding: Padding around court
-        line_thickness: Court line thickness
-        court: Optional pre-rendered court image
-    
-    Returns:
-        np.ndarray: Court image with markers
-    """
     if court is None:
-        court = draw_court(
-            config=config,
-            scale=scale,
-            padding=padding,
-            line_thickness=line_thickness,
-        )
-
-    made_stroke = (
-        made_thickness if made_thickness is not None else line_thickness
-    )
-    missed_stroke = (
-        miss_thickness if miss_thickness is not None else line_thickness
-    )
-
-    def point_to_pixel(point: Tuple[float, float]) -> Tuple[int, int]:
-        return _to_pixel(point, scale=scale, padding=padding)
-
-    # Normalize inputs to iterable collections
-    made_iter = (
-        np.atleast_2d(made_xy) if made_xy is not None and made_xy.size > 0 else ()
-    )
-    miss_iter = (
-        np.atleast_2d(miss_xy) if miss_xy is not None and miss_xy.size > 0 else ()
-    )
-
-    # Made goals: circle border
+        court = draw_court(config=config, scale=scale, padding=padding, line_thickness=line_thickness)
+    made_stroke   = made_thickness if made_thickness is not None else line_thickness
+    missed_stroke = miss_thickness if miss_thickness is not None else line_thickness
+    made_iter = np.atleast_2d(made_xy) if made_xy is not None and made_xy.size > 0 else ()
+    miss_iter = np.atleast_2d(miss_xy) if miss_xy is not None and miss_xy.size > 0 else ()
     for point in made_iter:
-        center_x, center_y = point_to_pixel(tuple(point))
-        cv2.circle(
-            img=court,
-            center=(center_x, center_y),
-            radius=made_size,
-            color=made_color.as_bgr(),
-            thickness=made_stroke,
-        )
-
-    # Missed shots: cross
+        cx, cy = _to_pixel(tuple(point), scale=scale, padding=padding)
+        cv2.circle(court, (cx, cy), made_size, made_color.as_bgr(), made_stroke)
     for point in miss_iter:
-        center_x, center_y = point_to_pixel(tuple(point))
-        x0, y0 = center_x - miss_size, center_y - miss_size
-        x1, y1 = center_x + miss_size, center_y + miss_size
-        cv2.line(court, (x0, y0), (x1, y1), miss_color.as_bgr(), missed_stroke)
-        cv2.line(court, (x0, y1), (x1, y0), miss_color.as_bgr(), missed_stroke)
-
+        cx, cy = _to_pixel(tuple(point), scale=scale, padding=padding)
+        cv2.line(court, (cx-miss_size, cy-miss_size), (cx+miss_size, cy+miss_size), miss_color.as_bgr(), missed_stroke)
+        cv2.line(court, (cx-miss_size, cy+miss_size), (cx+miss_size, cy-miss_size), miss_color.as_bgr(), missed_stroke)
     return court
 
 
@@ -392,93 +271,31 @@ def draw_points_on_court(
     line_thickness: int = 6,
     court: Optional[np.ndarray] = None,
 ) -> np.ndarray:
-    """
-    Draw points on the court.
-    Points render as circles with optional fill, edge, and center labels.
-    
-    Args:
-        config: Court configuration
-        xy: Array of (x, y) coordinates to draw
-        labels: Optional labels for each point
-        fill_color: Fill color for circles
-        text_color: Color for text labels
-        edge_color: Color for circle edges
-        size: Radius of circles
-        edge_thickness: Thickness of circle edges
-        scale: Scaling factor
-        padding: Padding around court
-        line_thickness: Court line thickness
-        court: Optional pre-rendered court image
-    
-    Returns:
-        np.ndarray: Court image with points
-    """
     if court is None:
-        court = draw_court(
-            config=config,
-            scale=scale,
-            padding=padding,
-            line_thickness=line_thickness,
-        )
-
+        court = draw_court(config=config, scale=scale, padding=padding, line_thickness=line_thickness)
     if xy is None or np.size(xy) == 0:
         return court
-
     pts = np.atleast_2d(xy)
     n = pts.shape[0]
-
     labels = labels if labels is not None else [None] * n
     if len(labels) < n:
         labels = list(labels) + [None] * (n - len(labels))
-
     stroke = edge_thickness if edge_thickness is not None else max(2, line_thickness // 2)
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = max(0.4, size / 28.0)
     font_thickness = max(1, size // 8)
-
     for i in range(n):
         cx, cy = _to_pixel(tuple(pts[i]), scale=scale, padding=padding)
-
-        # Face (fill)
         if fill_color is not None:
-            cv2.circle(
-                img=court,
-                center=(cx, cy),
-                radius=size,
-                color=fill_color.as_bgr(),
-                thickness=-1,
-                lineType=cv2.LINE_AA,
-            )
-
-        # Edge (outline)
+            cv2.circle(court, (cx, cy), size, fill_color.as_bgr(), -1, cv2.LINE_AA)
         if edge_color is not None and stroke > 0:
-            cv2.circle(
-                img=court,
-                center=(cx, cy),
-                radius=size,
-                color=edge_color.as_bgr(),
-                thickness=stroke,
-                lineType=cv2.LINE_AA,
-            )
-
-        # Label
+            cv2.circle(court, (cx, cy), size, edge_color.as_bgr(), stroke, cv2.LINE_AA)
         label = labels[i]
         if label is not None and str(label) != "":
             text = str(label)
-            (tw, th), base = cv2.getTextSize(text, font, font_scale, font_thickness)
-            tx = int(cx - tw / 2)
-            ty = int(cy + th / 2)
-            cv2.putText(
-                img=court,
-                text=text,
-                org=(tx, ty),
-                fontFace=font,
-                fontScale=font_scale,
-                color=text_color.as_bgr(),
-                thickness=font_thickness,
-                lineType=cv2.LINE_AA,
-            )
-
+            (tw, th), _ = cv2.getTextSize(text, font, font_scale, font_thickness)
+            cv2.putText(court, text, (int(cx - tw/2), int(cy + th/2)),
+                        font, font_scale, text_color.as_bgr(), font_thickness, cv2.LINE_AA)
     return court
 
 
@@ -492,80 +309,33 @@ def draw_paths_on_court(
     line_thickness: int = 6,
     court: Optional[np.ndarray] = None,
 ) -> np.ndarray:
-    """
-    Draw time-ordered paths as polylines in court coordinates.
-    Each path is an array of shape (T, 2) with x, y in court units.
-    NaN rows split a path into multiple segments.
-    
-    Args:
-        config: Court configuration
-        paths: List of path arrays, each shape (T, 2)
-        color: Color for path lines
-        thickness: Line thickness for paths
-        scale: Scaling factor
-        padding: Padding around court
-        line_thickness: Court line thickness
-        court: Optional pre-rendered court image
-    
-    Returns:
-        np.ndarray: Court image with paths
-    """
     if court is None:
-        court = draw_court(
-            config=config,
-            scale=scale,
-            padding=padding,
-            line_thickness=line_thickness,
-        )
-
+        court = draw_court(config=config, scale=scale, padding=padding, line_thickness=line_thickness)
     if not paths or color is None:
         return court
-
     stroke = thickness if thickness is not None else line_thickness
     bgr = color.as_bgr()
-
-    def to_segments(pts: np.ndarray) -> list[np.ndarray]:
+    def to_segments(pts):
         pts = np.atleast_2d(pts).astype(float)
-        segments = []
-        cur = []
+        segments, cur = [], []
         for p in pts:
             if np.isnan(p).any():
-                if len(cur) > 0:
+                if cur:
                     segments.append(np.asarray(cur, dtype=float))
                     cur = []
             else:
                 cur.append(p)
-        if len(cur) > 0:
+        if cur:
             segments.append(np.asarray(cur, dtype=float))
         return segments
-
     for path in paths:
         if path is None or np.size(path) == 0:
             continue
-
         for seg in to_segments(path):
             if seg.shape[0] >= 2:
-                poly = np.array(
-                    [[_to_pixel((float(x), float(y)), scale, padding) for x, y in seg]],
-                    dtype=np.int32,
-                )
-                cv2.polylines(
-                    img=court,
-                    pts=poly,
-                    isClosed=False,
-                    color=bgr,
-                    thickness=stroke,
-                    lineType=cv2.LINE_AA,
-                )
+                poly = np.array([[_to_pixel((float(x), float(y)), scale, padding) for x, y in seg]], dtype=np.int32)
+                cv2.polylines(court, poly, False, bgr, stroke, cv2.LINE_AA)
             elif seg.shape[0] == 1:
-                cx, cy = _to_pixel((float(seg[0, 0]), float(seg[0, 1])), scale, padding)
-                cv2.circle(
-                    img=court,
-                    center=(cx, cy),
-                    radius=max(1, stroke // 2),
-                    color=bgr,
-                    thickness=-1,
-                    lineType=cv2.LINE_AA,
-                )
-
+                cx, cy = _to_pixel((float(seg[0,0]), float(seg[0,1])), scale, padding)
+                cv2.circle(court, (cx, cy), max(1, stroke//2), bgr, -1, cv2.LINE_AA)
     return court

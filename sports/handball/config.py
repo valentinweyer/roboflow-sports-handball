@@ -315,45 +315,35 @@ class CourtConfiguration:
 
     edges: List[Tuple[int, int]] = field(default_factory=lambda: [
         # Outer court boundaries
-        (0, 5),   # Left baseline (KP 01 to KP 06)
-        (5, 19),  # Bottom baseline (KP 06 to KP 20)
-        (19, 32), # Right baseline bottom to corner (KP 20 to KP 33)
-        (32, 27), # Right baseline (KP 33 to KP 28)
-        (27, 13), # Top baseline (KP 28 to KP 14)
-        (13, 0),  # Top baseline left (KP 14 to KP 01)
-        
+        (0, 5),   # Left baseline          KP01 → KP06
+        (5, 19),  # Bottom baseline        KP06 → KP20
+        (19, 32), # Right baseline (bot)   KP20 → KP33
+        (32, 27), # Right baseline (top)   KP33 → KP28
+        (27, 13), # Top baseline           KP28 → KP14
+        (13, 0),  # Top baseline (left)    KP14 → KP01
+
         # Center line
-        (13, 19), # Center line (KP 14 to KP 20)
-        
+        (13, 19), # KP14 → KP20
+
         # Goal lines
-        (2, 3),   # Left goal (KP 03 to KP 04)
-        (29, 30), # Right goal (KP 30 to KP 31)
-        
-        # Left 6m area arc connections
-        (7, 8),   # Left 6m arc (KP 08 to KP 09)
-        (1, 7),   # Connection to 6m upper (KP 02 to KP 08)
-        (8, 4),   # Connection to 6m lower (KP 09 to KP 05)
-        
-        # Right 6m area arc connections
-        (24, 25), # Right 6m arc (KP 25 to KP 26)
-        (28, 24), # Connection to 6m upper (KP 29 to KP 25)
-        (25, 31), # Connection to 6m lower (KP 26 to KP 32)
-        
-        # Left 7m line (penalty line)
-        (11, 12), # Left 7m line (KP 12 to KP 13)
-        
-        # Right 7m line (penalty line)
-        (20, 21), # Right 7m line (KP 21 to KP 22)
-        
-        # Left 9m area arc connections
-        (33, 34), # Left 9m arc (KP 34 to KP 35)
-        
-        # Right 9m area arc connections
-        (35, 36), # Right 9m arc (KP 36 to KP 37)
-        
-        # Center circle
-        (15, 16), # Center circle left to center (KP 16 to KP 17)
-        (16, 17), # Center circle center to right (KP 17 to KP 18)
+        (2, 3),   # Left goal   KP03 → KP04
+        (29, 30), # Right goal  KP30 → KP31
+
+        # 6m straight segments (between tangent points, parallel to goal line)
+        (7, 8),   # Left  KP08 → KP09
+        (24, 25), # Right KP25 → KP26
+
+        # 9m straight segments
+        (33, 34), # Left  KP34 → KP35
+        (35, 36), # Right KP36 → KP37
+
+        # 7m lines
+        (11, 12), # Left  KP12 → KP13
+        (20, 21), # Right KP21 → KP22
+
+        # NOTE: goal post connection lines (1,7), (8,4), (28,24), (25,31)
+        # and center circle diameter lines (15,16), (16,17) are intentionally
+        # omitted — those are rendered as arcs by draw_court() in annotators.py.
     ])
 
     labels: List[str] = field(default_factory=lambda: [
