@@ -10,11 +10,17 @@ def _to_pixel(
     point: Tuple[float, float],
     scale: float,
     padding: int,
+    court_height: float = 2000.0,
 ) -> Tuple[int, int]:
-    """Scale court point to pixel space and apply padding."""
+    """Scale court point to pixel space and apply padding.
+
+    y is flipped so court y=0 (bottom) maps to the bottom of the image
+    and court y=court_height (top) maps to the top, matching real-world
+    orientation and keeping the homography target space consistent.
+    """
     return (
         int(round(point[0] * scale + padding)),
-        int(round(point[1] * scale + padding)),
+        int(round((court_height - point[1]) * scale + padding)),
     )
 
 

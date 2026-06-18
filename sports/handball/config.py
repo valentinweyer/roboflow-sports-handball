@@ -241,22 +241,22 @@ class CourtConfiguration:
         return [
             # LEFT SIDE (Purple keypoints 01-13, indices 0-12)
             (0, court_width),  # 0 (KP 01): Top left corner
-            (0, goal_end),  # 1 (KP 02): Left side upper 6m goal line intersection
+            (0, goal_end + self._goal_area_radius_in_centimeters),  # 1 (KP 02): Left upper 6m/goal-line intersection
             (0, goal_end),  # 2 (KP 03): Left side upper goal post
             (0, goal_start),  # 3 (KP 04): Left side lower goal post
-            (0, goal_start),  # 4 (KP 05): Left side lower 6m goal line intersection
+            (0, goal_start - self._goal_area_radius_in_centimeters),  # 4 (KP 05): Left lower 6m/goal-line intersection
             (0, 0),  # 5 (KP 06): Bottom left corner
-            (0, court_width),  # 6 (KP 07): Left top 9m out line intersection (at boundary)
-            # exact semicircle points around left goal center (0, middle_court_width)
-            # at y = middle ± goal_width/2
-            (581, goal_end),  # 7 (KP 08): Left 6m area upper point
-            (581, goal_start),  # 8 (KP 09): Left 6m area lower point
-            (0, 0),  # 9 (KP 10): Left lower 9m out line intersection (at boundary)
-            (self._goal_area_radius_in_centimeters, middle_court_width),  # 10 (KP 11): Left side interior point (6m center)
-            # 7m line is a short 1m line centered at mid-court width
+            # KP07/KP10: where the 9m arc meets the sideline.
+            # Arc centred at upper post (0, goal_end): x = sqrt(r9²-(court_width-goal_end)²)
+            # Arc centred at lower post (0, goal_start): x = sqrt(r9²-goal_start²)
+            (int(round((self._free_throw_line_distance_in_centimeters**2 - (court_width - goal_end)**2)**0.5)), court_width),  # 6 (KP 07): Left top 9m/sideline intersection
+            (self._goal_area_radius_in_centimeters, goal_end),  # 7 (KP 08): Left 6m upper tangent point
+            (self._goal_area_radius_in_centimeters, goal_start),  # 8 (KP 09): Left 6m lower tangent point
+            (int(round((self._free_throw_line_distance_in_centimeters**2 - goal_start**2)**0.5)), 0),  # 9 (KP 10): Left bottom 9m/sideline intersection
+            (self._goal_area_radius_in_centimeters, middle_court_width),  # 10 (KP 11): Left 6m straight midpoint
             (self._penalty_spot_distance_in_centimeters, middle_court_width + 50),  # 11 (KP 12): Left 7m line upper point
             (self._penalty_spot_distance_in_centimeters, middle_court_width - 50),  # 12 (KP 13): Left 7m line lower point
-            
+
             # CENTER SECTION (White keypoints 14-20, indices 13-19)
             (half_length, court_width),  # 13 (KP 14): Top center
             (half_length, goal_end),  # 14 (KP 15): Center mid-upper
@@ -265,31 +265,27 @@ class CourtConfiguration:
             (half_length + self._center_circle_radius_in_centimeters, middle_court_width),  # 17 (KP 18): Center right point
             (half_length, goal_start),  # 18 (KP 19): Center mid-lower
             (half_length, 0),  # 19 (KP 20): Bottom center
-            
+
             # RIGHT SIDE (Orange keypoints 21-33, indices 20-32)
-            # 7m line is a short 1m line centered at mid-court width
             (court_length - self._penalty_spot_distance_in_centimeters, middle_court_width + 50),  # 20 (KP 21): Right 7m line upper point
             (court_length - self._penalty_spot_distance_in_centimeters, middle_court_width - 50),  # 21 (KP 22): Right 7m line lower point
-            (court_length - self._goal_area_radius_in_centimeters, middle_court_width),  # 22 (KP 23): Right side interior point (6m center)
-            (court_length, court_width),  # 23 (KP 24): Right top 9m out line intersection (at boundary)
-            # exact semicircle points around right goal center (court_length, middle_court_width)
-            # at y = middle ± goal_width/2
-            (court_length - 581, goal_end),  # 24 (KP 25): Right 6m area upper point
-            (court_length - 581, goal_start),  # 25 (KP 26): Right 6m area lower point
-            (court_length, 0),  # 26 (KP 27): Right lower 9m out line intersection (at boundary)
+            (court_length - self._goal_area_radius_in_centimeters, middle_court_width),  # 22 (KP 23): Right 6m straight midpoint
+            (court_length - int(round((self._free_throw_line_distance_in_centimeters**2 - (court_width - goal_end)**2)**0.5)), court_width),  # 23 (KP 24): Right top 9m/sideline intersection
+            (court_length - self._goal_area_radius_in_centimeters, goal_end),  # 24 (KP 25): Right 6m upper tangent point
+            (court_length - self._goal_area_radius_in_centimeters, goal_start),  # 25 (KP 26): Right 6m lower tangent point
+            (court_length - int(round((self._free_throw_line_distance_in_centimeters**2 - goal_start**2)**0.5)), 0),  # 26 (KP 27): Right bottom 9m/sideline intersection
             (court_length, court_width),  # 27 (KP 28): Top right corner
-            (court_length, goal_end),  # 28 (KP 29): Right side upper 6m goal line intersection
+            (court_length, goal_end + self._goal_area_radius_in_centimeters),  # 28 (KP 29): Right upper 6m/goal-line intersection
             (court_length, goal_end),  # 29 (KP 30): Right side upper goal post
             (court_length, goal_start),  # 30 (KP 31): Right side lower goal post
-            (court_length, goal_start),  # 31 (KP 32): Right side lower 6m goal line intersection
+            (court_length, goal_start - self._goal_area_radius_in_centimeters),  # 31 (KP 32): Right lower 6m/goal-line intersection
             (court_length, 0),  # 32 (KP 33): Bottom right corner
-            
+
             # CENTER SECTION CONTINUED (White keypoints 34-37, indices 33-36)
-            # exact 9m semicircle points around goal centers at y = middle ± goal_width/2
-            (887, goal_end),  # 33 (KP 34): Left 9m area upper point
-            (887, goal_start),  # 34 (KP 35): Left 9m area lower point
-            (court_length - 887, goal_end),  # 35 (KP 36): Right 9m area upper point
-            (court_length - 887, goal_start),  # 36 (KP 37): Right 9m area lower point
+            (self._free_throw_line_distance_in_centimeters, goal_end),  # 33 (KP 34): Left 9m upper tangent point
+            (self._free_throw_line_distance_in_centimeters, goal_start),  # 34 (KP 35): Left 9m lower tangent point
+            (court_length - self._free_throw_line_distance_in_centimeters, goal_end),  # 35 (KP 36): Right 9m upper tangent point
+            (court_length - self._free_throw_line_distance_in_centimeters, goal_start),  # 36 (KP 37): Right 9m lower tangent point
         ]
 
     def _vertices_in_unit(self) -> List[Tuple[float, float]]:
@@ -325,9 +321,13 @@ class CourtConfiguration:
         # Center line
         (13, 19), # KP14 → KP20
 
-        # Goal lines
-        (2, 3),   # Left goal   KP03 → KP04
-        (29, 30), # Right goal  KP30 → KP31
+        # Goal lines (6m intersection → upper post → lower post → 6m intersection)
+        (1, 2),   # Left  KP02 → KP03
+        (2, 3),   # Left  KP03 → KP04
+        (3, 4),   # Left  KP04 → KP05
+        (28, 29), # Right KP29 → KP30
+        (29, 30), # Right KP30 → KP31
+        (30, 31), # Right KP31 → KP32
 
         # 6m straight segments (between tangent points, parallel to goal line)
         (7, 8),   # Left  KP08 → KP09
@@ -340,10 +340,6 @@ class CourtConfiguration:
         # 7m lines
         (11, 12), # Left  KP12 → KP13
         (20, 21), # Right KP21 → KP22
-
-        # NOTE: goal post connection lines (1,7), (8,4), (28,24), (25,31)
-        # and center circle diameter lines (15,16), (16,17) are intentionally
-        # omitted — those are rendered as arcs by draw_court() in annotators.py.
     ])
 
     labels: List[str] = field(default_factory=lambda: [
